@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>🎉 Selaaammm Aleynaaa 🎉</title>
+  
+  <style>
+    :root{ --text-color:#0f172a; --muted:#6b7280; }
+    
+    html,body{
+      height:100%; margin:0;
+      font-family:'Poppins',system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial;
+    }
+    body{
+      display:flex; align-items:center; justify-content:center;
+      background: linear-gradient(180deg,#f8fafc,#eef2ff);
+      overflow:hidden; transition: padding 360ms ease;
+    }
+
+    /* === ARKA PLAN FOTO STİLİ (13-14 İÇİN) === */
+    #bgImage{
+      position:fixed; inset:0;
+      background-position:center;
+      background-size: contain;
+      background-repeat:no-repeat;
+      opacity:0;
+      transition:opacity 420ms ease, filter 420ms ease;
+      z-index:0;
+    }
+    #overlay{
+      position:fixed; inset:0; background:transparent;
+      transition: background 420ms ease; z-index:1; pointer-events:none;
+    }
+    canvas#confetti{ position:fixed; inset:0; pointer-events:none; z-index:2; }
+    
+    /* === YÜZEN KÜÇÜK FOTOLAR İÇİN === */
+    #floatingContainer {
+        position: fixed; inset: 0; pointer-events: none; z-index: 3;
+        display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+    }
+    
+    /* --- PC İÇİN FOTO AYARLARI (BÜYÜK) --- */
+    .float-img {
+        position: absolute;
+        max-width: 280px; /* PC'de büyük */
+        max-height: 280px;
+        border-radius: 12px;
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        opacity: 0;
+        transform: scale(0.5) rotate(-10deg);
+        transition: opacity 500ms ease, transform 500ms cubic-bezier(0.17, 0.67, 0.38, 1.45);
+        border: 4px solid #fff;
+    }
+    .float-img.show { opacity: 1; transform: scale(1) rotate(0deg); }
+    .float-img:nth-child(odd) { transform: scale(0.5) rotate(10deg); }
+    .float-img.show:nth-child(odd) { transform: scale(1) rotate(-3deg); }
+    .float-img.show:nth-child(even) { transform: scale(1) rotate(3deg); }
+
+    /* YAZI KUTUSU */
+    #text {
+      position:relative; z-index:4;
+      font-size: clamp(20px, 3vw, 28px); 
+      color:var(--text-color);
+      max-width:920px; width:90%;
+      text-align:center; line-height:1.6;
+      padding:30px 26px; border-radius:12px;
+      background: rgba(255,255,255,0.85);
+      box-shadow: 0 10px 30px rgba(2,6,23,0.08);
+      transition: transform 360ms ease, background 360ms ease;
+    }
+    
+    body.photo-mode { align-items: flex-start; padding-top: 10vh; }
+    #text.photo-mode { transform: scale(0.92); background: rgba(255,255,255,0.75); }
+
+    #hint {
+      position:fixed; bottom:18px; left:50%; transform:translateX(-50%);
+      font-size:14px; color:var(--muted); z-index:5; opacity:0;
+      transition:opacity 240ms ease; background: rgba(255,255,255,0.85);
+      padding:8px 12px; border-radius:999px;
+      box-shadow: 0 6px 18px rgba(2,6,23,0.06);
+    }
+
+    /* === FİNAL SAHNESİ (KEDİ FOTOSU) === */
+    #finalScene { 
+      display:none; position:relative; z-index:4;
+      flex-direction:column; align-items:center; justify-content:flex-end; /* Yazıyı alta yasla */
+      text-align:center;
+      width: 300px;  /* PC'de kutu genişliği */
+      height: 350px; /* PC'de kutu yüksekliği */
+      padding: 18px;
+      border-radius:14px;
+      box-shadow: 0 12px 40px rgba(2,6,23,0.12);
+      
+      /* === FİNAL KEDİSİ DOSYADAN ÇAĞRILIYOR === */
+      background-image: url('final_kedi.jpg');
+      background-size: cover;
+      background-position: center;
+      
+      transition: transform 360ms cubic-bezier(.2,.9,.3,1);
+    }
+    
+    #finalText{ 
+      font-size:1.2rem; 
+      color:var(--text-color); 
+      padding:6px 10px; 
+      border-radius:10px; 
+      background: rgba(255, 255, 255, 0.9); /* Yazı okunsun diye hafif fon */
+    }
+
+    /* === MOBİL AYARLARI (TELEFON İÇİN) === */
+    @media (max-width:560px){
+      #text{ padding:16px; font-size:18px; } 
+      
+      #finalScene {
+         width: 240px; /* Mobilde kutu genişliği */
+         height: 280px; /* Mobilde kutu yüksekliği */
+      }
+      
+      .float-img { 
+          max-width: 110px; 
+          max-height: 110px; 
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="bgImage" aria-hidden="true"></div>
+  <div id="overlay" aria-hidden="true"></div>
+  <canvas id="confetti"></canvas>
+  <div id="floatingContainer"></div>
+  <div id="text" role="main" aria-live="polite"></div>
+  <div id="hint">Devam etmek için ekrana dokun 👆</div>
+
+  <div id="finalScene" aria-hidden="true">
+    <div id="finalText">Aleyna Hanım Ağa, doğum günüsünüz kutlu olsun 🎉</div>
+  </div>
+
+
+  <script>
+    // ============================================================
+    // 1. YÜZEN FOTO AYARLARI (Dosya adları)
+    // ============================================================
+    const floatingImages = {
+      5: [ 'foto1.jpg', 'foto2.jpg', 'foto3.jpg' ], // 6. Mesaj
+      6: [ 'foto4.jpg' ], // 7. Mesaj
+      7: [ 'foto5.jpg' ], // 8. Mesaj
+      9: [ 'foto6.jpg' ]  // 10. Mesaj
+    };
+    
+    const positions = [
+      { top: '20%', left: '15%' },    // Sol Üst (Daha içeride)
+      { top: '20%', right: '15%' },   // Sağ Üst (Daha içeride)
+      { bottom: '20%', left: '20%' }  // Sol Alt (Daha içeride)
+    ];
+
+    // ============================================================
+    // 2. ARKA PLAN FOTO AYARLARI (Dosya adları)
+    // ============================================================
+    const backgroundImages = {
+      13: `bg13.jpg`, 
+      14: `bg14.jpg`  
+    };
+
+
+    const texts = [
+      "Selaaammm Aleynaaa 👋",
+      "Bunu beklemiyo olabilirsin... belki de bekliyosundur :)",
+      "Neyse, asıl konuya geçelim 😌",
+      "Kayseri'de sıkılıyodum e ben sıkılıyosam sen de sıkılıyosundur 😅",
+      "Dedim bari şu miniği biraz mutlu edeyim 😌",
+      "Bazen küfürbaz olsan da 😂", // [Index 5] 
+      "Bazen pek seçenek sunmasan da 😅", // [Index 6] 
+      "Sıkıntılı olsan da 🙃", // [Index 7] 
+      "Merak etmeee seviyorum seni 💫",
+      "Eee tabi senin de beni sevdiğini biliyorum 😌", // [Index 9] 
+      "Doğum günün kutlu olsun 🎉",
+      "Yeni yaşın sana sağlık, huzur ve güzel günler getirsin 🌸",
+      "Güzellik getirsin dicem de pek ihtiyacın yok 😏",
+      "Ankara'da olsak belki bir kahve ile kutlardık ☕ (Ağa kahveyle yetinmezdi ama olsun 😅)", // [Index 13] 
+      "Şimdilik uzaktan iyi dileklerimi yolluyorum :) Umarım günün güzel geçer 💫" // [Index 14] 
+    ];
+
+    const textEl = document.getElementById('text');
+    const hint = document.getElementById('hint');
+    const bgImage = document.getElementById('bgImage');
+    const overlay = document.getElementById('overlay');
+    const finalScene = document.getElementById('finalScene'); 
+    const floatContainer = document.getElementById('floatingContainer');
+
+    let index = 0;
+    let charIndex = 0;
+    let typing = false;
+
+    function typeWriter() {
+      textEl.style.display = '';
+      
+      floatContainer.innerHTML = ''; 
+      if (floatingImages[index]) {
+        const imgs = floatingImages[index];
+        imgs.forEach((src, i) => {
+          const img = document.createElement('img');
+          img.src = src;
+          img.className = 'float-img';
+          if (imgs.length === 1) {
+             img.style.top = '25%'; img.style.right = '18%';
+          } else {
+             const pos = positions[i % positions.length];
+             Object.assign(img.style, pos);
+          }
+          floatContainer.appendChild(img);
+          setTimeout(() => img.classList.add('show'), 50 + (i * 100));
+        });
+      }
+      
+      if (backgroundImages[index]) {
+        bgImage.style.backgroundImage = `url('${backgroundImages[index]}')`;
+        bgImage.style.opacity = 1;
+        overlay.style.background = 'rgba(0,0,0,0.32)';
+        document.body.classList.add('photo-mode');
+        textEl.classList.add('photo-mode');
+      }
+
+      if (charIndex < texts[index].length) {
+        typing = true;
+        textEl.innerHTML += texts[index].charAt(charIndex);
+        charIndex++;
+        setTimeout(typeWriter, 45);
+      } else {
+        typing = false;
+        hint.style.opacity = 1;
+      }
+    }
+
+    document.body.addEventListener('click', () => {
+      if (typing) return;
+      hint.style.opacity = 0;
+
+      floatContainer.innerHTML = ''; 
+      
+      if (backgroundImages[index]) {
+        if (!backgroundImages[index + 1]) {
+            bgImage.style.opacity = 0;
+            overlay.style.background = 'transparent';
+            document.body.classList.remove('photo-mode');
+            textEl.classList.remove('photo-mode');
+        }
+      }
+
+      // === FİNAL SAHNESİNİ GÖSTER ===
+      if (index >= texts.length - 1) {
+        textEl.style.display = 'none';
+        hint.style.display = 'none';
+        
+        finalScene.style.display = 'flex'; 
+        finalScene.style.transform = 'scale(0.92)';
+        finalScene.style.transition = 'transform 360ms cubic-bezier(.2,.9,.3,1)';
+        setTimeout(()=> finalScene.style.transform='scale(1)', 40);
+        return;
+      }
+
+      index++;
+      charIndex = 0;
+      textEl.innerHTML = '';
+      setTimeout(typeWriter, 260);
+    });
+
+    typeWriter();
+
+    // Confetti
+    const canvas = document.getElementById('confetti');
+    const ctx = canvas.getContext('2d');
+    let W, H;
+    function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+    window.addEventListener('resize', resize); resize();
+    const colors = ['#F87171', '#60A5FA', '#34D399', '#FBBF24', '#A78BFA'];
+    const pieces = [];
+    const PIECE_COUNT = 120;
+    for (let i = 0; i < PIECE_COUNT; i++) {
+      pieces.push({
+        x: Math.random() * W, y: Math.random() * H, r: Math.random() * 6 + 3,
+        c: colors[Math.floor(Math.random() * colors.length)],
+        vy: Math.random() * 2 + 0.6, vx: Math.random() * 1.2 - 0.6,
+        rot: Math.random() * Math.PI * 2, vr: Math.random() * 0.06 - 0.03
+      });
+    }
+    function drawConfetti() {
+      ctx.clearRect(0,0,W,H);
+      pieces.forEach(p => {
+        p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+        if (p.y > H + 10) p.y = -10; if (p.x > W + 20) p.x = -10; if (p.x < -20) p.x = W + 10;
+        ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot);
+        ctx.fillStyle = p.c; ctx.fillRect(-p.r/2,-p.r/2,p.r,p.r*1.6);
+        ctx.restore();
+      });
+      requestAnimationFrame(drawConfetti);
+    }
+    drawConfetti();
+  </script>
+</body>
+</html>
